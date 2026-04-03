@@ -1,6 +1,8 @@
-import jwt from 'jsonwebtoken';
+import { SignJWT, jwtVerify } from 'jose';
 
-const SECRET = process.env.JWT_SECRET || 'grouppay-dev-secret-change-in-prod';
+const SECRET = new TextEncoder().encode(
+  process.env.JWT_SECRET || 'grouppay-dev-secret-change-in-prod'
+);
 
 export interface JWTPayload {
   memberId: string;
@@ -10,26 +12,26 @@ export interface JWTPayload {
   name: string;
 }
 
-export function signToken(payload: JWTPayload): string {
-  return jwt.sign(payload, SECRET, { expiresIn: '7d' });
+export async function signToken(payload: JWTPayload): Promise<string> {
+  return new SignJWT({ ...payload })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setExpirationTime('7d')
+    .sign(SECRET);
 }
 
-export function verifyToken(token: string): JWTPayload | null {
+export async function verifyToken(token: string): Promise<JWTPayload | null> {
   try {
-    return jwt.verify(token, SECRET) as JWTPayload;
+    const { payload } = await jwtVerify(token, SECRET);
+    return payload as unknown as JWTPayload;
   } catch {
     return null;
   }
 }
 
-// Demo: validate credentials against hardcoded users
-// In production, query your database and compare bcrypt hashes
 export function validateCredentials(email: string, password: string): import('./data').Member | null {
-  // Demo passwords: all use "demo123"
   const { MEMBERS } = require('./data');
   const member = MEMBERS.find((m: import('./data').Member) => m.email === email);
   if (!member) return null;
-  // In production: bcrypt.compareSync(password, member.passwordHash)
   if (password !== 'demo123') return null;
   return member;
 }
